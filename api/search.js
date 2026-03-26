@@ -20,9 +20,25 @@ module.exports = async (req, res) => {
 
   try {
     if (GOOGLE_API_KEY) {
-      // Google Places API使用
-      const results = await searchGooglePlaces(query, maxResults);
-      return res.json({ results, source: 'google' });
+      // Google Places API使用  — まずテスト呼び出し
+      const testData = await placesTextSearch(query, null);
+      console.log('Google API status:', testData.status, testData.error_message || '');
+      
+      if (testData.status === 'REQUEST_DENIED' || testData.status === 'OVER_QUERY_LIMIT') {
+        // APIキーが無効 or 課金未設定 → iタウンページにフォールバック
+        console.error('Google API拒否:', testData.error_message);
+        const results = await searchITownPageFast(query, maxResults);
+        return res.json({ results, source: 'itown', apiError: testData.error_message || testData.status });
+      }
+      
+      if (testData.status === 'OK' || testData.status === 'ZERO_RESULTS') {
+        const results = await processGoogleResults(testData, query, maxResults);
+        return res.json({ results, source: 'google' });
+      }
+      
+      // それ以外のステータス
+      const results = await searchITownPageFast(query, maxResults);
+      return res.json({ results, source: 'itown', apiError: testData.status });
     }
 
     // APIキーなし → iタウンページ（1ページ高速取得）
@@ -35,18 +51,18 @@ module.exports = async (req, res) => {
   }
 };
 
-// ===== Google Places Text Search =====
-async function searchGooglePlaces(query, maxResults) {
+// ===== Google Places 結果処理 =====
+async function processGoogleResults(firstData, query, maxResults) {
   const results = [];
-  let nextPageToken = null;
 
-  while (results.length < maxResults) {
-    const data = await placesTextSearch(query, nextPageToken);
+  // 最初のレスポンスを処理
+  let data = firstData;
+  while (data && results.length < maxResults) {
     if (!data.results || data.results.length === 0) break;
 
     for (const place of data.results) {
       if (results.length >= maxResults) break;
-      // 詳細取得（電話・HP）
+      // 詳細取得（電話・HP）- 1件ずつ
       let phone = '', website = '';
       try {
         const d = await placesDetails(place.place_id);
@@ -64,9 +80,9 @@ async function searchGooglePlaces(query, maxResults) {
       });
     }
 
-    nextPageToken = data.next_page_token;
-    if (!nextPageToken || results.length >= maxResults) break;
+    if (!data.next_page_token || results.length >= maxResults) break;
     await new Promise(r => setTimeout(r, 2000));
+    data = await placesTextSearch(query, data.next_page_token);
   }
 
   return results;
