@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   
   const { query, max } = req.query;
-  const maxResults = Math.min(parseInt(max) || 20, 50);
+  const maxResults = Math.min(parseInt(max) || 20, 200);
 
   if (!query) {
     return res.json({ error: 'queryパラメータが必要です' });
@@ -99,24 +99,41 @@ function placesDetails(placeId) {
   return httpGetJSON(url).then(d => d.result || {});
 }
 
-// ===== iタウンページ 高速版（1ページのみ） =====
+// ===== iタウンページ 複数ページ対応版 =====
 async function searchITownPageFast(query, maxResults) {
   const results = [];
+  let page = 1;
+  const perPage = 50;
   
-  try {
-    // iタウンページ検索（タイムアウト3秒）
-    const url = `https://itp.ne.jp/result/?kw=${encodeURIComponent(query)}&num=50&sr=1`;
-    const html = await httpGetText(url, 4000);
-    
-    // HTMLからデータ抽出
-    const parsed = extractBusinessData(html);
-    
-    for (const item of parsed) {
-      if (results.length >= maxResults) break;
-      results.push(item);
+  while (results.length < maxResults) {
+    try {
+      // iタウンページ検索（各ページ50件、ページネーション対応）
+      const sr = (page - 1) * perPage + 1;
+      const url = `https://itp.ne.jp/result/?kw=${encodeURIComponent(query)}&num=${perPage}&sr=${sr}`;
+      const html = await httpGetText(url, 5000);
+      
+      // HTMLからデータ抽出
+      const parsed = extractBusinessData(html);
+      
+      // 取得件数が0なら終了（最終ページを超えた）
+      if (parsed.length === 0) break;
+      
+      for (const item of parsed) {
+        if (results.length >= maxResults) break;
+        results.push(item);
+      }
+      
+      // 取得件数がperPage未満なら最終ページ
+      if (parsed.length < perPage) break;
+      
+      page++;
+      // 最大4ページまで（200件）
+      if (page > 4) break;
+      
+    } catch (e) {
+      console.error('iタウンページ取得エラー (ページ' + page + '):', e.message);
+      break;
     }
-  } catch (e) {
-    console.error('iタウンページ取得エラー:', e.message);
   }
 
   // iタウンページから取れなかった場合、代替データソースを使用
