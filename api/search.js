@@ -11,8 +11,9 @@ const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   
-  const { query, max } = req.query;
-  const maxResults = Math.min(parseInt(max) || 20, 200);
+  const { query, max, page } = req.query;
+  const maxResults = Math.min(parseInt(max) || 50, 50);
+  const pageNum = parseInt(page) || 1;
 
   if (!query) {
     return res.json({ error: 'queryパラメータが必要です' });
@@ -27,27 +28,27 @@ module.exports = async (req, res) => {
       if (testData.status === 'REQUEST_DENIED' || testData.status === 'OVER_QUERY_LIMIT') {
         // APIキーが無効 or 課金未設定 → iタウンページにフォールバック
         console.error('Google API拒否:', testData.error_message);
-        const results = await searchITownPageFast(query, maxResults);
-        return res.json({ results, source: 'itown', apiError: testData.error_message || testData.status });
+        const results = await searchITownPage(query, maxResults, pageNum);
+        return res.json({ results, source: 'itown', page: pageNum, apiError: testData.error_message || testData.status });
       }
       
       if (testData.status === 'OK' || testData.status === 'ZERO_RESULTS') {
         const results = await processGoogleResults(testData, query, maxResults);
-        return res.json({ results, source: 'google' });
+        return res.json({ results, source: 'google', page: pageNum });
       }
       
       // それ以外のステータス
-      const results = await searchITownPageFast(query, maxResults);
-      return res.json({ results, source: 'itown', apiError: testData.status });
+      const results = await searchITownPage(query, maxResults, pageNum);
+      return res.json({ results, source: 'itown', page: pageNum, apiError: testData.status });
     }
 
-    // APIキーなし → iタウンページ（1ページ高速取得）
-    const results = await searchITownPageFast(query, maxResults);
-    return res.json({ results, source: 'itown' });
+    // APIキーなし → iタウンページ（1ページずつ取得）
+    const results = await searchITownPage(query, maxResults, pageNum);
+    return res.json({ results, source: 'itown', page: pageNum });
 
   } catch (err) {
     console.error('検索エラー:', err);
-    return res.json({ error: err.message || '検索中にエラーが発生しました', results: [] });
+    return res.json({ error: err.message || '検索中にエラーが発生しました', results: [], page: pageNum });
   }
 };
 
@@ -99,38 +100,26 @@ function placesDetails(placeId) {
   return httpGetJSON(url).then(d => d.result || {});
 }
 
-// ===== iタウンページ 並列取得版 =====
-async function searchITownPageFast(query, maxResults) {
+// ===== iタウンページ 1ページ取得 =====
+async function searchITownPage(query, maxResults, pageNum) {
   const perPage = 50;
-  const totalPages = Math.min(Math.ceil(maxResults / perPage), 4);
+  const sr = (pageNum - 1) * perPage + 1;
   
-  // 全ページを並列で取得（高速化）
-  const urls = [];
-  for (let page = 1; page <= totalPages; page++) {
-    const sr = (page - 1) * perPage + 1;
-    urls.push(`https://itp.ne.jp/result/?kw=${encodeURIComponent(query)}&num=${perPage}&sr=${sr}`);
-  }
-  
-  const fetches = urls.map(url => httpGetText(url, 4000).catch(() => ''));
-  const htmlPages = await Promise.all(fetches);
-  
-  const results = [];
-  for (const html of htmlPages) {
-    if (!html) continue;
+  try {
+    const url = `https://itp.ne.jp/result/?kw=${encodeURIComponent(query)}&num=${perPage}&sr=${sr}`;
+    const html = await httpGetText(url, 5000);
+    
     const parsed = extractBusinessData(html);
-    for (const item of parsed) {
-      if (results.length >= maxResults) break;
-      results.push(item);
-    }
-    if (results.length >= maxResults) break;
+    const results = parsed.slice(0, maxResults);
+    return results;
+  } catch (e) {
+    console.error('iタウンページ取得エラー:', e.message);
   }
 
-  // iタウンページから取れなかった場合、代替データソースを使用
-  if (results.length === 0) {
+  if (pageNum === 1) {
     return await searchAlternative(query, maxResults);
   }
-
-  return results;
+  return [];
 }
 
 // HTML解析 - iタウンページ
