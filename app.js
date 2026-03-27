@@ -65,19 +65,41 @@ async function startSearch() {
     // maxResultsで切る
     if (results.length > maxResults) results = results.slice(0, maxResults);
 
-    progressBar.style.width = '100%';
-    progressText.textContent = '✅ 完了！ ' + results.length + '件取得';
+    progressBar.style.width = '85%';
+    progressText.textContent = '📧 メールアドレスを取得中...';
 
-    // サマリー更新
+    // テーブル描画（メアド取得前に表示）
     updateSummary(results);
-
-    // テーブル描画
     renderResults(results);
 
-    // 少し待ってから進捗を隠す
+    // HPがある企業のメアドを取得
+    var withWebsite = results.filter(function(r) { return r.website; });
+    for (var i = 0; i < withWebsite.length; i++) {
+      try {
+        var emailRes = await fetch('/api/email?url=' + encodeURIComponent(withWebsite[i].website));
+        var emailData = await emailRes.json();
+        if (emailData.email) {
+          withWebsite[i].email = emailData.email;
+        }
+      } catch(e) {}
+      var emailPct = 85 + (i / withWebsite.length) * 14;
+      progressBar.style.width = emailPct + '%';
+      progressText.textContent = '📧 メアド取得中... (' + (i+1) + '/' + withWebsite.length + ')';
+      // 途中経過も反映
+      updateSummary(results);
+      renderResults(results);
+    }
+
+    progressBar.style.width = '100%';
+    var emailCount = results.filter(function(r) { return r.email; }).length;
+    progressText.textContent = '✅ 完了！ ' + results.length + '件取得 / メアド ' + emailCount + '件';
+
+    updateSummary(results);
+    renderResults(results);
+
     setTimeout(function() {
       progressSection.classList.add('hidden');
-    }, 2000);
+    }, 3000);
 
   } catch (err) {
     progressBar.style.width = '100%';
@@ -96,7 +118,7 @@ function updateSummary(items) {
   document.getElementById('totalCount').textContent = items.length;
   document.getElementById('phoneCount').textContent = items.filter(function(i) { return i.phone; }).length;
   document.getElementById('websiteCount').textContent = items.filter(function(i) { return i.website; }).length;
-  document.getElementById('ratingCount').textContent = items.filter(function(i) { return i.rating; }).length;
+  document.getElementById('ratingCount').textContent = items.filter(function(i) { return i.email; }).length;
 }
 
 // テーブル描画
@@ -109,10 +131,6 @@ function renderResults(items) {
   items.forEach(function(item, idx) {
     var tr = document.createElement('tr');
 
-    var ratingHtml = item.rating
-      ? '<span class="rating-stars">' + '⭐'.repeat(Math.round(item.rating)) + '</span> ' + item.rating
-      : '<span class="no-data">-</span>';
-
     var websiteHtml = item.website
       ? '<a href="' + esc(item.website) + '" target="_blank">🔗 開く</a>'
       : '<span class="no-data">-</span>';
@@ -121,14 +139,17 @@ function renderResults(items) {
       ? '<a href="tel:' + esc(item.phone) + '">' + esc(item.phone) + '</a>'
       : '<span class="no-data">-</span>';
 
+    var emailHtml = item.email
+      ? '<a href="mailto:' + esc(item.email) + '">' + esc(item.email) + '</a>'
+      : '<span class="no-data">-</span>';
+
     tr.innerHTML =
       '<td>' + (idx + 1) + '</td>' +
       '<td><strong>' + esc(item.name || '') + '</strong></td>' +
       '<td>' + esc(item.address || '') + '</td>' +
       '<td>' + phoneHtml + '</td>' +
-      '<td>' + websiteHtml + '</td>' +
-      '<td>' + ratingHtml + '</td>' +
-      '<td>' + (item.reviews || '<span class="no-data">-</span>') + '</td>';
+      '<td>' + emailHtml + '</td>' +
+      '<td>' + websiteHtml + '</td>';
 
     tbody.appendChild(tr);
   });
@@ -139,15 +160,14 @@ function exportCSV() {
   if (results.length === 0) { alert('データがありません'); return; }
 
   var bom = '\uFEFF';
-  var header = '会社名,住所,電話番号,ウェブサイト,評価,口コミ数\n';
+  var header = '会社名,住所,電話番号,メールアドレス,ウェブサイト\n';
   var rows = results.map(function(item) {
     return [
       csvEscape(item.name || ''),
       csvEscape(item.address || ''),
       csvEscape(item.phone || ''),
+      csvEscape(item.email || ''),
       csvEscape(item.website || ''),
-      item.rating || '',
-      item.reviews || '',
     ].join(',');
   }).join('\n');
 
