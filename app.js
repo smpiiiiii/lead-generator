@@ -33,24 +33,37 @@ async function startSearch() {
   results = [];
 
   try {
-    // バックエンドAPI呼び出し
+    // バックエンドAPI呼び出し（複数ページ対応）
     var query = prefecture + (city ? ' ' + city : '') + ' ' + industry;
-    var params = 'query=' + encodeURIComponent(query) + '&max=' + maxResults;
+    var totalPages = Math.ceil(maxResults / 50);
 
-    progressBar.style.width = '20%';
+    progressBar.style.width = '10%';
     progressText.textContent = '🏢 企業情報を取得中...';
 
-    var response = await fetch('/api/search?' + params);
-    var data = await response.json();
+    for (var page = 1; page <= totalPages; page++) {
+      var params = 'query=' + encodeURIComponent(query) + '&max=50&page=' + page;
+      var response = await fetch('/api/search?' + params);
+      var data = await response.json();
 
-    progressBar.style.width = '70%';
-    progressText.textContent = '📊 データを整理中...';
+      if (data.error) {
+        if (page === 1) throw new Error(data.error);
+        break;
+      }
 
-    if (data.error) {
-      throw new Error(data.error);
+      var pageResults = data.results || [];
+      if (pageResults.length === 0) break;
+
+      results = results.concat(pageResults);
+
+      var pct = Math.min(10 + (page / totalPages) * 80, 90);
+      progressBar.style.width = pct + '%';
+      progressText.textContent = '🏢 ' + results.length + '件取得済み... (ページ ' + page + '/' + totalPages + ')';
+
+      if (results.length >= maxResults || pageResults.length < 50) break;
     }
 
-    results = data.results || [];
+    // maxResultsで切る
+    if (results.length > maxResults) results = results.slice(0, maxResults);
 
     progressBar.style.width = '100%';
     progressText.textContent = '✅ 完了！ ' + results.length + '件取得';
