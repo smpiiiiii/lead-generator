@@ -5,6 +5,9 @@
 
 // グローバル変数
 var results = [];
+var currentPage = 0;
+var lastQuery = '';
+var lastMaxPerBatch = 200;
 
 // 検索実行
 async function startSearch() {
@@ -30,17 +33,21 @@ async function startSearch() {
 
   document.getElementById('summarySection').classList.add('hidden');
   document.getElementById('resultsSection').classList.add('hidden');
+  hideLoadMore();
   results = [];
+  currentPage = 0;
 
   try {
     // バックエンドAPI呼び出し（複数ページ対応）
     var query = prefecture + (city ? ' ' + city : '') + ' ' + industry;
+    lastQuery = query;
+    lastMaxPerBatch = maxResults;
     var totalPages = Math.ceil(maxResults / 50);
 
     progressBar.style.width = '10%';
     progressText.textContent = '🏢 企業情報を取得中...';
 
-    for (var page = 1; page <= totalPages; page++) {
+    for (var page = currentPage + 1; page <= currentPage + totalPages; page++) {
       var params = 'query=' + encodeURIComponent(query) + '&max=50&page=' + page;
       var response = await fetch('/api/search?' + params);
       var data = await response.json();
@@ -59,8 +66,11 @@ async function startSearch() {
       progressBar.style.width = pct + '%';
       progressText.textContent = '🏢 ' + results.length + '件取得済み... (ページ ' + page + '/' + totalPages + ')';
 
-      if (results.length >= maxResults || pageResults.length < 50) break;
+      if (results.length >= currentPage * 50 + maxResults || pageResults.length < 50) break;
     }
+
+    // ページオフセット更新
+    currentPage += totalPages;
 
     // maxResultsで切る
     if (results.length > maxResults) results = results.slice(0, maxResults);
@@ -100,6 +110,9 @@ async function startSearch() {
     setTimeout(function() {
       progressSection.classList.add('hidden');
     }, 3000);
+
+    // もっと読み込むボタン表示
+    showLoadMore();
 
   } catch (err) {
     progressBar.style.width = '100%';
@@ -214,4 +227,89 @@ function csvEscape(str) {
     return '"' + str.replace(/"/g, '""') + '"';
   }
   return str;
+}
+
+// もっと読み込む
+async function loadMore() {
+  var btn = document.getElementById('loadMoreBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 追加取得中...';
+
+  var progressSection = document.getElementById('progressSection');
+  var progressBar = document.getElementById('progressBar');
+  var progressText = document.getElementById('progressText');
+  progressSection.classList.remove('hidden');
+  progressBar.style.width = '5%';
+  progressBar.style.background = '';
+
+  var totalPages = Math.ceil(lastMaxPerBatch / 50);
+  var prevCount = results.length;
+
+  try {
+    for (var page = currentPage + 1; page <= currentPage + totalPages; page++) {
+      var params = 'query=' + encodeURIComponent(lastQuery) + '&max=50&page=' + page;
+      var response = await fetch('/api/search?' + params);
+      var data = await response.json();
+
+      var pageResults = data.results || [];
+      if (pageResults.length === 0) break;
+
+      results = results.concat(pageResults);
+
+      var pct = Math.min(10 + ((page - currentPage) / totalPages) * 70, 80);
+      progressBar.style.width = pct + '%';
+      progressText.textContent = '🏢 追加 ' + (results.length - prevCount) + '件取得中... (ページ ' + page + ')';
+
+      if (pageResults.length < 50) break;
+    }
+
+    currentPage += totalPages;
+
+    // 新しく取得した分のメアドを取得
+    progressBar.style.width = '85%';
+    progressText.textContent = '📧 メアド取得中...';
+
+    var newItems = results.slice(prevCount);
+    var withWebsite = newItems.filter(function(r) { return r.website; });
+    for (var i = 0; i < withWebsite.length; i++) {
+      try {
+        var emailRes = await fetch('/api/email?url=' + encodeURIComponent(withWebsite[i].website));
+        var emailData = await emailRes.json();
+        if (emailData.email) withWebsite[i].email = emailData.email;
+      } catch(e) {}
+      progressText.textContent = '📧 メアド取得中... (' + (i+1) + '/' + withWebsite.length + ')';
+    }
+
+    var added = results.length - prevCount;
+    progressBar.style.width = '100%';
+    progressText.textContent = '✅ 追加 ' + added + '件！ 合計 ' + results.length + '件';
+
+    updateSummary(results);
+    renderResults(results);
+
+    setTimeout(function() { progressSection.classList.add('hidden'); }, 3000);
+
+  } catch(e) {
+    progressText.textContent = '❌ エラー: ' + e.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '➕ もっと読み込む（次の' + lastMaxPerBatch + '件）';
+}
+
+function showLoadMore() {
+  var el = document.getElementById('loadMoreSection');
+  if (el) { el.classList.remove('hidden'); return; }
+  el = document.createElement('div');
+  el.id = 'loadMoreSection';
+  el.style.cssText = 'text-align:center;padding:16px;';
+  el.innerHTML = '<button id="loadMoreBtn" class="btn-search" onclick="loadMore()" style="background:linear-gradient(135deg,#059669,#047857)">' +
+    '<span class="btn-icon">➕</span><span>もっと読み込む（次の' + lastMaxPerBatch + '件）</span></button>';
+  var footer = document.querySelector('.app-footer');
+  footer.parentNode.insertBefore(el, footer);
+}
+
+function hideLoadMore() {
+  var el = document.getElementById('loadMoreSection');
+  if (el) el.classList.add('hidden');
 }
