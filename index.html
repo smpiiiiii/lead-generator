@@ -109,6 +109,23 @@
     <div class="export-buttons">
       <button class="btn-export csv" onclick="exportCSV()">📥 CSVダウンロード</button>
       <button class="btn-export copy" onclick="copyToClipboard()">📋 コピー</button>
+      <button class="btn-export clear" onclick="clearData()">🗑️ クリア</button>
+    </div>
+  </section>
+
+  <!-- フィルターバー -->
+  <section id="filterBar" class="filter-bar hidden">
+    <div class="filter-bar-inner">
+      <div class="search-input-wrap-lead">
+        <span class="search-icon-lead">🔍</span>
+        <input type="text" id="tableSearch" class="table-search" placeholder="テーブル内検索...">
+      </div>
+      <div class="filter-chips-lead">
+        <button class="filter-chip-lead" data-filter="email">📧 メアドあり</button>
+        <button class="filter-chip-lead" data-filter="phone">📞 電話あり</button>
+        <button class="filter-chip-lead" data-filter="fav">★ お気に入り</button>
+      </div>
+      <div class="filter-count" id="filterCount" style="display:none"></div>
     </div>
   </section>
 
@@ -118,11 +135,11 @@
       <table id="resultsTable">
         <thead>
           <tr>
-            <th>#</th>
-            <th>会社名</th>
-            <th>住所</th>
-            <th>電話番号</th>
-            <th>メアド</th>
+            <th style="width:36px">★</th>
+            <th data-sort="name" onclick="sortBy('name')" class="sortable">会社名</th>
+            <th data-sort="address" onclick="sortBy('address')" class="sortable">住所</th>
+            <th data-sort="phone" onclick="sortBy('phone')" class="sortable">電話番号</th>
+            <th data-sort="email" onclick="sortBy('email')" class="sortable">メアド</th>
             <th>HP</th>
           </tr>
         </thead>
@@ -139,5 +156,13 @@
 </div>
 
 <script src="app.js"></script>
+<script>
+// フィルターバーの表示管理
+var _origUpdateSummary = updateSummary;
+updateSummary = function(items) {
+  _origUpdateSummary(items);
+  document.getElementById('filterBar').classList.remove('hidden');
+};
+</script>
 </body>
 </html>

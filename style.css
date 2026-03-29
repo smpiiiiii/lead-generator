@@ -280,3 +280,133 @@ td a:hover {
 .searching .btn-icon {
   animation: pulse 1s infinite;
 }
+
+/* お気に入り */
+.fav-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: rgba(255,255,255,.15);
+  transition: all .15s;
+  padding: 2px;
+  line-height: 1;
+}
+.fav-btn:hover { color: rgba(255,215,0,.4); transform: scale(1.2); }
+.fav-btn.active { color: #ffd700; text-shadow: 0 0 8px rgba(255,215,0,.4); }
+.fav-row td { background: rgba(255,215,0,.03) !important; }
+
+/* ソート可能ヘッダー */
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 18px !important;
+}
+.sortable:hover { color: var(--text); }
+.sortable::after {
+  content: '↕';
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  opacity: .3;
+}
+.sortable.sort-asc::after { content: '↑'; opacity: .8; color: var(--accent); }
+.sortable.sort-desc::after { content: '↓'; opacity: .8; color: var(--accent); }
+
+/* フィルターバー */
+.filter-bar {
+  margin-bottom: 12px;
+}
+.filter-bar-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+.search-input-wrap-lead {
+  position: relative;
+  margin-bottom: 8px;
+}
+.search-icon-lead {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  pointer-events: none;
+}
+.table-search {
+  width: 100%;
+  padding: 10px 10px 10px 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 600;
+  outline: none;
+  transition: border-color .2s;
+}
+.table-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(108,92,231,.15);
+}
+.table-search::placeholder { color: var(--text-secondary); }
+.filter-chips-lead {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.filter-chip-lead {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.filter-chip-lead.active {
+  background: rgba(108,92,231,.15);
+  border-color: rgba(108,92,231,.4);
+  color: var(--accent);
+}
+.filter-chip-lead:active { transform: scale(.95); }
+.filter-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+  margin-top: 6px;
+}
+
+/* Googleマップリンク */
+.map-link {
+  opacity: .5;
+  transition: opacity .2s;
+  text-decoration: none !important;
+  margin-left: 4px;
+}
+.map-link:hover { opacity: 1; }
+
+/* データクリアボタン */
+.btn-export.clear {
+  background: rgba(231,76,60,.1);
+  color: #e74c3c;
+  border: 1px solid rgba(231,76,60,.2);
+}
+.btn-export.clear:hover {
+  background: rgba(231,76,60,.2);
+}
+
+/* トーストアニメーション */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
