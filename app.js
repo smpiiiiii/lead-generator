@@ -146,7 +146,8 @@ async function startSearch() {
   currentPage = 0;
 
   try {
-    var query = prefecture + (city ? ' ' + city : '') + ' ' + industry;
+    var keyword2 = document.getElementById('keyword2Input').value.trim();
+    var query = prefecture + (city ? ' ' + city : '') + ' ' + industry + (keyword2 ? ' ' + keyword2 : '');
     lastQuery = query;
     lastMaxPerBatch = maxResults;
     var totalPages = Math.ceil(maxResults / 50);
